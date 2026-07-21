@@ -170,11 +170,20 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	defer s.hub.Unsubscribe(c)
 	heartbeat := time.NewTicker(15 * time.Second)
 	defer heartbeat.Stop()
+	updates := time.NewTicker(200 * time.Millisecond)
+	defer updates.Stop()
+	dirty := false
 	for {
 		select {
 		case <-r.Context().Done():
 			return
 		case <-c:
+			dirty = true
+		case <-updates.C:
+			if !dirty {
+				continue
+			}
+			dirty = false
 			q, st := s.hub.Snapshot()
 			b, _ := json.Marshal(map[string]any{"layout": s.store.Get(), "quotes": q, "status": st})
 			fmt.Fprintf(w, "data: %s\n\n", b)
