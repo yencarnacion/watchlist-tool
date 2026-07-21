@@ -107,7 +107,13 @@ func (h *Hub) Update(symbol string, fn func(*Quote)) {
 		q.ChangePct = (q.Last/q.PrevClose - 1) * 100
 	}
 	if q.Last > 0 && (old != q.Last || len(q.History) == 0) {
-		q.History = append(q.History, Point{T: time.Now().UnixMilli(), P: q.Last})
+		now := time.Now().UnixMilli()
+		if n := len(q.History); n > 0 && q.History[n-1].T/60000 == now/60000 {
+			q.History[n-1].P = q.Last
+			q.History[n-1].T = now
+		} else {
+			q.History = append(q.History, Point{T: now, P: q.Last})
+		}
 		if len(q.History) > h.maxPoints {
 			q.History = q.History[len(q.History)-h.maxPoints:]
 		}

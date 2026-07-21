@@ -32,3 +32,16 @@ func TestExtendedSessionAndVolume(t *testing.T) {
 		t.Fatalf("got volume %.0f, want 425", quotes["TEST"].Volume)
 	}
 }
+
+func TestLiveHistoryCoalescesWithinMinute(t *testing.T) {
+	hub := NewHub(1000)
+	hub.Update("TEST", func(q *Quote) { q.Last = 10 })
+	hub.Update("TEST", func(q *Quote) { q.Last = 11 })
+	quotes, _ := hub.Snapshot()
+	if got := len(quotes["TEST"].History); got != 1 {
+		t.Fatalf("got %d live points in one minute, want 1", got)
+	}
+	if got := quotes["TEST"].History[0].P; got != 11 {
+		t.Fatalf("got latest minute price %.2f, want 11", got)
+	}
+}
