@@ -18,17 +18,19 @@ import (
 type Point struct {
 	T int64   `json:"t"`
 	P float64 `json:"p"`
+	V float64 `json:"v,omitempty"`
 }
 type Quote struct {
-	Symbol    string  `json:"symbol"`
-	Last      float64 `json:"last"`
-	Bid       float64 `json:"bid"`
-	Ask       float64 `json:"ask"`
-	Volume    float64 `json:"volume"`
-	ChangePct float64 `json:"change_pct"`
-	PrevClose float64 `json:"prev_close"`
-	Updated   int64   `json:"updated"`
-	History   []Point `json:"history"`
+	Symbol      string  `json:"symbol"`
+	CompanyName string  `json:"company_name,omitempty"`
+	Last        float64 `json:"last"`
+	Bid         float64 `json:"bid"`
+	Ask         float64 `json:"ask"`
+	Volume      float64 `json:"volume"`
+	ChangePct   float64 `json:"change_pct"`
+	PrevClose   float64 `json:"prev_close"`
+	Updated     int64   `json:"updated"`
+	History     []Point `json:"history"`
 }
 type Status struct {
 	State     string `json:"state"`
@@ -42,6 +44,40 @@ type Hub struct {
 	status    Status
 	maxPoints int
 	listeners map[chan struct{}]struct{}
+}
+
+// SetHistory replaces a symbol's intraday series with time-ordered minute data.
+// A live point newer than the historical response is retained so a slow backfill
+// cannot make the day map jump backwards.
+func (h *Hub) SetHistory(symbol string, points []Point) {
+	h.mu.Lock()
+	q := h.quotes[symbol]
+	if q == nil {
+		q = &Quote{Symbol: symbol}
+		h.quotes[symbol] = q
+	}
+	copyPoints := append([]Point(nil), points...)
+	if n := len(q.History); n > 0 && (len(copyPoints) == 0 || q.History[n-1].T > copyPoints[len(copyPoints)-1].T) {
+		copyPoints = append(copyPoints, q.History[n-1])
+	}
+	if len(copyPoints) > h.maxPoints {
+		copyPoints = copyPoints[len(copyPoints)-h.maxPoints:]
+	}
+	q.History = copyPoints
+	q.Volume = 0
+	for _, point := range copyPoints {
+		q.Volume += point.V
+	}
+	h.mu.Unlock()
+	h.signal()
+}
+func (h *Hub) SetCompanyName(symbol, name string) {
+	h.mu.Lock()
+	if q := h.quotes[symbol]; q != nil {
+		q.CompanyName = strings.TrimSpace(name)
+	}
+	h.mu.Unlock()
+	h.signal()
 }
 
 func NewHub(max int) *Hub {
@@ -71,7 +107,7 @@ func (h *Hub) Update(symbol string, fn func(*Quote)) {
 		q.ChangePct = (q.Last/q.PrevClose - 1) * 100
 	}
 	if q.Last > 0 && (old != q.Last || len(q.History) == 0) {
-		q.History = append(q.History, Point{time.Now().UnixMilli(), q.Last})
+		q.History = append(q.History, Point{T: time.Now().UnixMilli(), P: q.Last})
 		if len(q.History) > h.maxPoints {
 			q.History = q.History[len(q.History)-h.maxPoints:]
 		}
@@ -122,13 +158,16 @@ func (h *Hub) signal() {
 }
 
 type IBKR struct {
-	cfg    config.Config
-	hub    *Hub
-	mu     sync.RWMutex
-	client *ibapi.EClient
-	req    map[int64]string
-	next   int64
-	wanted map[string]bool
+	cfg        config.Config
+	hub        *Hub
+	mu         sync.RWMutex
+	client     *ibapi.EClient
+	req        map[int64]string
+	historyReq map[int64]string
+	history    map[int64][]Point
+	detailsReq map[int64]string
+	next       int64
+	wanted     map[string]bool
 }
 type wrapper struct {
 	ibapi.Wrapper
@@ -138,7 +177,7 @@ type wrapper struct {
 }
 
 func NewIBKR(c config.Config, h *Hub) *IBKR {
-	return &IBKR{cfg: c, hub: h, req: map[int64]string{}, wanted: map[string]bool{}, next: 2000}
+	return &IBKR{cfg: c, hub: h, req: map[int64]string{}, historyReq: map[int64]string{}, history: map[int64][]Point{}, detailsReq: map[int64]string{}, wanted: map[string]bool{}, next: 2000}
 }
 func (f *IBKR) SetSymbols(ss []string) {
 	desired := make(map[string]bool, len(ss))
@@ -217,6 +256,9 @@ func (f *IBKR) Run(ctx context.Context) {
 		f.mu.Lock()
 		f.client = nil
 		f.req = map[int64]string{}
+		f.historyReq = map[int64]string{}
+		f.history = map[int64][]Point{}
+		f.detailsReq = map[int64]string{}
 		f.mu.Unlock()
 		if !wait(ctx, delay) {
 			return
@@ -229,6 +271,17 @@ func (f *IBKR) subscribeLocked(s string) {
 	f.req[id] = s
 	contract := &ibapi.Contract{Symbol: s, SecType: "STK", Exchange: f.cfg.IBKR.Exchange, Currency: f.cfg.IBKR.Currency}
 	f.client.ReqMktData(id, contract, "233", false, false, nil)
+	f.next++
+	historyID := f.next
+	f.historyReq[historyID] = s
+	f.history[historyID] = nil
+	// A full US extended-hours session at one-minute resolution. Epoch timestamps
+	// (formatDate=2) keep timezone conversion in the browser unambiguous.
+	f.client.ReqHistoricalData(historyID, contract, "", "1 D", "1 min", "TRADES", false, 2, false, nil)
+	f.next++
+	detailsID := f.next
+	f.detailsReq[detailsID] = s
+	f.client.ReqContractDetails(detailsID, contract)
 }
 func (f *IBKR) symbol(id int64) string  { f.mu.RLock(); defer f.mu.RUnlock(); return f.req[id] }
 func (w *wrapper) NextValidID(id int64) { w.once.Do(func() { close(w.ready) }) }
@@ -261,14 +314,8 @@ func (w *wrapper) TickPrice(id ibapi.TickerID, t ibapi.TickType, p float64, a ib
 	})
 }
 func (w *wrapper) TickSize(id ibapi.TickerID, t ibapi.TickType, size ibapi.Decimal) {
-	s := w.feed.symbol(id)
-	if s == "" {
-		return
-	}
-	if t == ibapi.VOLUME || t == ibapi.DELAYED_VOLUME {
-		v := size.Float()
-		w.feed.hub.Update(s, func(q *Quote) { q.Volume = v })
-	}
+	// Volume is intentionally built from 04:00 ET minute bars plus RT_VOLUME
+	// trade sizes. IBKR's generic VOLUME tick does not define that boundary.
 }
 func (w *wrapper) TickString(id ibapi.TickerID, t ibapi.TickType, value string) {
 	s := w.feed.symbol(id)
@@ -280,7 +327,7 @@ func (w *wrapper) TickString(id ibapi.TickerID, t ibapi.TickType, value string) 
 		return
 	}
 	last, _ := strconv.ParseFloat(p[0], 64)
-	vol, _ := strconv.ParseFloat(p[3], 64)
+	size, _ := strconv.ParseFloat(p[1], 64)
 	if math.IsNaN(last) {
 		return
 	}
@@ -288,10 +335,66 @@ func (w *wrapper) TickString(id ibapi.TickerID, t ibapi.TickType, value string) 
 		if last > 0 {
 			q.Last = last
 		}
-		if vol >= 0 {
-			q.Volume = vol
+		if size > 0 {
+			q.Volume += size
 		}
 	})
+}
+func (w *wrapper) HistoricalData(id int64, bar *ibapi.Bar) {
+	w.feed.mu.Lock()
+	if _, ok := w.feed.historyReq[id]; ok {
+		seconds, err := strconv.ParseInt(bar.Date, 10, 64)
+		if err == nil && bar.Close > 0 {
+			w.feed.history[id] = append(w.feed.history[id], Point{T: seconds * 1000, P: bar.Close, V: bar.Volume.Float()})
+		}
+	}
+	w.feed.mu.Unlock()
+}
+func (w *wrapper) HistoricalDataEnd(id int64, _, _ string) {
+	w.feed.mu.Lock()
+	symbol := w.feed.historyReq[id]
+	points := append([]Point(nil), w.feed.history[id]...)
+	delete(w.feed.historyReq, id)
+	delete(w.feed.history, id)
+	w.feed.mu.Unlock()
+	if symbol != "" {
+		loc, err := time.LoadLocation(w.feed.cfg.App.Timezone)
+		if err == nil {
+			points = extendedSession(points, loc)
+		}
+		w.feed.hub.SetHistory(symbol, points)
+	}
+}
+
+func extendedSession(points []Point, loc *time.Location) []Point {
+	if len(points) == 0 {
+		return points
+	}
+	latest := time.UnixMilli(points[len(points)-1].T).In(loc)
+	year, month, day := latest.Date()
+	out := make([]Point, 0, len(points))
+	for _, point := range points {
+		at := time.UnixMilli(point.T).In(loc)
+		y, m, d := at.Date()
+		minute := at.Hour()*60 + at.Minute()
+		if y == year && m == month && d == day && minute >= 4*60 && minute <= 20*60 {
+			out = append(out, point)
+		}
+	}
+	return out
+}
+func (w *wrapper) ContractDetails(id int64, details *ibapi.ContractDetails) {
+	w.feed.mu.RLock()
+	symbol := w.feed.detailsReq[id]
+	w.feed.mu.RUnlock()
+	if symbol != "" && details.LongName != "" {
+		w.feed.hub.SetCompanyName(symbol, details.LongName)
+	}
+}
+func (w *wrapper) ContractDetailsEnd(id int64) {
+	w.feed.mu.Lock()
+	delete(w.feed.detailsReq, id)
+	w.feed.mu.Unlock()
 }
 func wait(ctx context.Context, d time.Duration) bool {
 	select {
@@ -314,6 +417,18 @@ func (d *Demo) SetSymbols(s []string) {
 	d.symbols = append([]string(nil), s...)
 	d.mu.Unlock()
 	d.hub.Symbols(s)
+	now := time.Now()
+	for i, symbol := range s {
+		base := 20 + float64((i*37)%180)
+		points := make([]Point, 0, 720)
+		start := time.Date(now.Year(), now.Month(), now.Day(), 4, 0, 0, 0, now.Location())
+		for minute := 0; minute <= 720; minute++ {
+			price := base + math.Sin(float64(minute+i)*.035)*base*.018 + float64(minute)*base*.000015
+			points = append(points, Point{T: start.Add(time.Duration(minute) * time.Minute).UnixMilli(), P: price})
+		}
+		d.hub.SetHistory(symbol, points)
+		d.hub.SetCompanyName(symbol, symbol+" DEMO COMPANY")
+	}
 }
 func (d *Demo) Run(ctx context.Context) {
 	d.hub.SetStatus(Status{State: "demo", Connected: true, Message: "synthetic market feed"})

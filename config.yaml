@@ -14,5 +14,5 @@ integrations:
   tape_url: http://127.0.0.1:8097/api/ticker
   polygon_url: http://127.0.0.1:8081
 display:
-  history_points: 720
+  history_points: 1000
   stale_after: 15s
