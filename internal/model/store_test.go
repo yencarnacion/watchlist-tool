@@ -22,14 +22,31 @@ func TestRepeatedScannerAlertPromotesWithoutDuplicate(t *testing.T) {
 		t.Fatalf("duplicate received new ID %q != %q", again.ID, first.ID)
 	}
 	got := s.Get()
+	if len(got.Lists[1].Items) != 1 || got.Lists[1].Items[0].Symbol != "NVDA" {
+		t.Fatalf("focus=%+v", got.Lists[1].Items)
+	}
+	if got.Lists[1].Items[0].Note != "second alert" {
+		t.Fatalf("note=%q", got.Lists[1].Items[0].Note)
+	}
+	if len(got.Lists[2].Items) != 1 || got.Lists[2].Items[0].Symbol != "AAPL" {
+		t.Fatalf("watch=%+v", got.Lists[2].Items)
+	}
+}
+
+func TestAPIPostDefaultsToTopAPIList(t *testing.T) {
+	s, err := Open(t.TempDir() + "/watchlists.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Add("NVDA", "", "scanner"); err != nil {
+		t.Fatal(err)
+	}
+	got := s.Get()
+	if got.Lists[0].ID != "api" || got.Lists[0].Name != "API" {
+		t.Fatalf("top list = %+v, want API", got.Lists[0])
+	}
 	if len(got.Lists[0].Items) != 1 || got.Lists[0].Items[0].Symbol != "NVDA" {
-		t.Fatalf("focus=%+v", got.Lists[0].Items)
-	}
-	if got.Lists[0].Items[0].Note != "second alert" {
-		t.Fatalf("note=%q", got.Lists[0].Items[0].Note)
-	}
-	if len(got.Lists[1].Items) != 1 || got.Lists[1].Items[0].Symbol != "AAPL" {
-		t.Fatalf("watch=%+v", got.Lists[1].Items)
+		t.Fatalf("API items = %+v", got.Lists[0].Items)
 	}
 }
 

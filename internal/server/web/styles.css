@@ -24,7 +24,7 @@ main{padding:12px;display:grid;gap:12px}
 .list-name{border:0;background:transparent;font-size:17px;font-weight:900;letter-spacing:.06em;width:220px}
 .count{font-size:12px;color:var(--muted)}
 .remove-list{margin-left:auto;border:0;background:none;color:#69737f;font-size:21px}
-.columns,.ticker{display:grid;grid-template-columns:minmax(125px,1.1fr) minmax(105px,.8fr) minmax(85px,.65fr) minmax(130px,.85fr) 320px 116px;align-items:center;column-gap:10px}
+.columns,.ticker{display:grid;grid-template-columns:minmax(125px,1.1fr) minmax(105px,.8fr) minmax(85px,.65fr) minmax(130px,.85fr) 320px 208px;align-items:center;column-gap:10px}
 .columns{height:28px;padding:0 10px;color:#737e89;font-size:11px;font-weight:850;letter-spacing:.05em;border-bottom:1px solid #202730}
 .ticker{min-height:182px;padding:6px 10px;border-bottom:1px solid #202730;background:#0e1217}
 .ticker:last-child{border:0}
@@ -52,7 +52,9 @@ main{padding:12px;display:grid;gap:12px}
 .day-context>footer b{color:#dce2e7;font-weight:800}
 .map-position{color:var(--day-direction)}
 .actions{display:flex;justify-content:flex-end;gap:5px}
+.actions select{width:87px;height:34px;padding:0 5px;color:var(--muted);font-size:11px;font-weight:800}
 .actions button{width:33px;height:34px;padding:0;font-size:17px}
+.remove-list:disabled{visibility:hidden}
 .delete{color:#ff7b88}
 .empty{height:70px;display:grid;place-items:center;color:#65707c;font-weight:750}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(80px);padding:11px 18px;background:#262e38;border:1px solid #596572;border-radius:6px;font-weight:750;transition:.2s;z-index:10}
@@ -64,7 +66,7 @@ form{order:3;min-width:100%;max-width:none}
 .ticker{grid-template-columns:1fr 1fr 1fr}
 .day-context{grid-column:1/4;width:320px;height:170px}
 .volume{text-align:right}
-.actions{position:absolute;right:12px}
+.actions{position:absolute;right:12px;bottom:12px}
 .ticker{position:relative;padding-right:125px}
 .status{margin-left:0}
 }

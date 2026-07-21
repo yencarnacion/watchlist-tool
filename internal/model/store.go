@@ -40,7 +40,7 @@ type Store struct {
 }
 
 func Open(path string) (*Store, error) {
-	s := &Store{path: path, data: Layout{Lists: []List{{ID: "focus", Name: "FOCUS", Color: "#ffd166"}, {ID: "watch", Name: "WATCH", Color: "#4cc9f0"}}}}
+	s := &Store{path: path, data: Layout{Lists: []List{{ID: "api", Name: "API", Color: "#9bdb4d"}, {ID: "focus", Name: "FOCUS", Color: "#ffd166"}, {ID: "watch", Name: "WATCH", Color: "#4cc9f0"}}}}
 	b, err := os.ReadFile(path)
 	if err == nil {
 		if err = json.Unmarshal(b, &s.data); err != nil {
@@ -49,9 +49,7 @@ func Open(path string) (*Store, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
-	if len(s.data.Lists) == 0 {
-		s.data.Lists = []List{{ID: "focus", Name: "FOCUS", Color: "#ffd166"}}
-	}
+	ensureAPI(&s.data)
 	return s, nil
 }
 func (s *Store) Get() Layout {
@@ -70,6 +68,7 @@ func (s *Store) Get() Layout {
 func (s *Store) Replace(v Layout) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	ensureAPI(&v)
 	if err := validate(&v); err != nil {
 		return err
 	}
@@ -84,7 +83,7 @@ func (s *Store) Add(symbol, listID, note string) (Item, error) {
 		return Item{}, errors.New("invalid symbol")
 	}
 	if listID == "" {
-		listID = s.data.Lists[0].ID
+		listID = "api"
 	}
 	target := -1
 	for li := range s.data.Lists {
@@ -113,6 +112,29 @@ func (s *Store) Add(symbol, listID, note string) (Item, error) {
 	it := Item{ID: strings.ToLower(symbol) + "-" + time.Now().Format("150405.000"), Symbol: symbol, Note: strings.TrimSpace(note), AddedAt: time.Now()}
 	s.data.Lists[target].Items = append([]Item{it}, s.data.Lists[target].Items...)
 	return it, s.save()
+}
+func ensureAPI(v *Layout) {
+	api := -1
+	for i := range v.Lists {
+		if v.Lists[i].ID == "api" || strings.EqualFold(strings.TrimSpace(v.Lists[i].Name), "api") {
+			api = i
+			break
+		}
+	}
+	if api < 0 {
+		v.Lists = append([]List{{ID: "api", Name: "API", Color: "#9bdb4d", Items: []Item{}}}, v.Lists...)
+		return
+	}
+	v.Lists[api].ID = "api"
+	v.Lists[api].Name = "API"
+	if v.Lists[api].Color == "" {
+		v.Lists[api].Color = "#9bdb4d"
+	}
+	if api > 0 {
+		list := v.Lists[api]
+		v.Lists = append(v.Lists[:api], v.Lists[api+1:]...)
+		v.Lists = append([]List{list}, v.Lists...)
+	}
 }
 func (s *Store) Delete(id string) error {
 	s.mu.Lock()
