@@ -57,3 +57,12 @@ func TestUpsertPointReplacesLiveBarVolume(t *testing.T) {
 		t.Fatalf("new bar was not inserted in timestamp order: %#v", points)
 	}
 }
+
+func TestIgnoreExpectedHistoricalCancellation(t *testing.T) {
+	if !ignoreIBKRError(162, "Historical Market Data Service error message:API historical data query cancelled: 2014") {
+		t.Fatal("expected client-side historical cancellation to be ignored")
+	}
+	if ignoreIBKRError(162, "Historical data request pacing violation") {
+		t.Fatal("real historical data errors must remain visible")
+	}
+}

@@ -307,11 +307,21 @@ func (w *wrapper) ConnectionClosed() {
 	w.feed.hub.SetStatus(Status{State: "reconnecting", Message: "IBKR connection closed"})
 }
 func (w *wrapper) Error(id ibapi.TickerID, at, code int64, msg, advanced string) {
-	if code >= 2100 && code <= 2199 {
+	if ignoreIBKRError(code, msg) {
 		return
 	}
 	log.Printf("IBKR error req=%d code=%d message=%q", id, code, msg)
 	w.feed.hub.SetStatus(Status{State: "degraded", Connected: true, Message: fmt.Sprintf("IBKR %d: %s", code, msg)})
+}
+
+func ignoreIBKRError(code int64, msg string) bool {
+	if code >= 2100 && code <= 2199 {
+		return true
+	}
+	// TWS acknowledges CancelHistoricalData with code 162. Cancellation is an
+	// expected part of removing a ticker, not a feed degradation. Other 162
+	// responses (for example pacing violations) must still reach the UI.
+	return code == 162 && strings.Contains(strings.ToLower(msg), "historical data query cancelled")
 }
 func (w *wrapper) TickPrice(id ibapi.TickerID, t ibapi.TickType, p float64, a ibapi.TickAttrib) {
 	s := w.feed.symbol(id)
