@@ -39,6 +39,7 @@ func (s *Server) Run(ctx context.Context) error {
 	mux.HandleFunc("/api/tickers/", s.ticker)
 	mux.HandleFunc("/api/layout", s.layout)
 	mux.HandleFunc("/api/select", s.selectTicker)
+	mux.HandleFunc("/api/chart", s.chart)
 	mux.HandleFunc("/api/events", s.events)
 	sub, _ := fs.Sub(assets, "web")
 	mux.Handle("/", headers(http.FileServer(http.FS(sub))))
@@ -136,9 +137,22 @@ func (s *Server) selectTicker(w http.ResponseWriter, r *http.Request) {
 	if resp != nil {
 		resp.Body.Close()
 	}
+	write(w, 200, map[string]any{"symbol": symbol, "tape_ok": tapeOK, "tape_error": errText(err)})
+}
+func (s *Server) chart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		method(w)
+		return
+	}
+	var in struct{ Symbol string }
+	if json.NewDecoder(r.Body).Decode(&in) != nil || model.Symbol(in.Symbol) == "" {
+		bad(w, "invalid symbol")
+		return
+	}
+	symbol := model.Symbol(in.Symbol)
 	loc, _ := time.LoadLocation(s.cfg.App.Timezone)
-	chart := strings.TrimRight(s.cfg.Integrations.PolygonURL, "/") + "/api/open-chart/" + url.PathEscape(symbol) + "/" + time.Now().In(loc).Format("2006-01-02")
-	write(w, 200, map[string]any{"symbol": symbol, "chart_url": chart, "tape_ok": tapeOK, "tape_error": errText(err)})
+	chartURL := strings.TrimRight(s.cfg.Integrations.PolygonURL, "/") + "/api/open-chart/" + url.PathEscape(symbol) + "/" + time.Now().In(loc).Format("2006-01-02")
+	write(w, 200, map[string]any{"symbol": symbol, "chart_url": chartURL})
 }
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
