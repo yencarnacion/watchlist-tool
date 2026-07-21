@@ -1,0 +1,18 @@
+app:
+  addr: ":8098"
+  timezone: America/New_York
+  data_file: data/watchlists.json
+ibkr:
+  host: 127.0.0.1
+  port: 7497
+  client_id: 98
+  exchange: SMART
+  currency: USD
+  market_data_type: 1
+  reconnect_interval: 2s
+integrations:
+  tape_url: http://127.0.0.1:8097/api/ticker
+  polygon_url: http://127.0.0.1:8081
+display:
+  history_points: 720
+  stale_after: 15s
