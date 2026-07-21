@@ -206,6 +206,15 @@ func (f *IBKR) SetSymbols(ss []string) {
 				delete(f.req, id)
 			}
 		}
+		for id, subscribed := range f.historyReq {
+			if subscribed == s {
+				if f.client != nil && f.client.IsConnected() {
+					f.client.CancelHistoricalData(id)
+				}
+				delete(f.historyReq, id)
+				delete(f.history, id)
+			}
+		}
 	}
 	for s := range desired {
 		if !f.wanted[s] {
@@ -283,7 +292,10 @@ func (f *IBKR) subscribeLocked(s string) {
 	f.history[historyID] = nil
 	// A full US extended-hours session at one-minute resolution. Epoch timestamps
 	// (formatDate=2) keep timezone conversion in the browser unambiguous.
-	f.client.ReqHistoricalData(historyID, contract, "", "1 D", "1 min", "TRADES", false, 2, false, nil)
+	// keepUpToDate makes IBKR refresh the current bar every few seconds. This is
+	// both lighter and more reliable than reconstructing volume from individual
+	// RT_VOLUME messages, which can have gaps around the initial backfill.
+	f.client.ReqHistoricalData(historyID, contract, "", "1 D", "1 min", "TRADES", false, 2, true, nil)
 	f.next++
 	detailsID := f.next
 	f.detailsReq[detailsID] = s
@@ -320,8 +332,8 @@ func (w *wrapper) TickPrice(id ibapi.TickerID, t ibapi.TickType, p float64, a ib
 	})
 }
 func (w *wrapper) TickSize(id ibapi.TickerID, t ibapi.TickType, size ibapi.Decimal) {
-	// Volume is intentionally built from 04:00 ET minute bars plus RT_VOLUME
-	// trade sizes. IBKR's generic VOLUME tick does not define that boundary.
+	// Volume is intentionally sourced from the continuously updated 04:00 ET
+	// minute bars. IBKR's generic VOLUME tick does not define that boundary.
 }
 func (w *wrapper) TickString(id ibapi.TickerID, t ibapi.TickType, value string) {
 	s := w.feed.symbol(id)
@@ -333,16 +345,12 @@ func (w *wrapper) TickString(id ibapi.TickerID, t ibapi.TickType, value string) 
 		return
 	}
 	last, _ := strconv.ParseFloat(p[0], 64)
-	size, _ := strconv.ParseFloat(p[1], 64)
 	if math.IsNaN(last) {
 		return
 	}
 	w.feed.hub.Update(s, func(q *Quote) {
 		if last > 0 {
 			q.Last = last
-		}
-		if size > 0 {
-			q.Volume += size
 		}
 	})
 }
@@ -360,16 +368,54 @@ func (w *wrapper) HistoricalDataEnd(id int64, _, _ string) {
 	w.feed.mu.Lock()
 	symbol := w.feed.historyReq[id]
 	points := append([]Point(nil), w.feed.history[id]...)
-	delete(w.feed.historyReq, id)
-	delete(w.feed.history, id)
 	w.feed.mu.Unlock()
-	if symbol != "" {
-		loc, err := time.LoadLocation(w.feed.cfg.App.Timezone)
-		if err == nil {
-			points = extendedSession(points, loc)
-		}
-		w.feed.hub.SetHistory(symbol, points)
+	w.publishHistory(symbol, points)
+}
+
+// HistoricalDataUpdate is emitted for a keepUpToDate request as IBKR revises
+// the active minute bar. Replacing that bar keeps cumulative 04:00 ET volume
+// current without issuing a fresh historical request for every ticker.
+func (w *wrapper) HistoricalDataUpdate(id int64, bar *ibapi.Bar) {
+	seconds, err := strconv.ParseInt(bar.Date, 10, 64)
+	if err != nil || bar.Close <= 0 {
+		return
 	}
+	point := Point{T: seconds * 1000, P: bar.Close, V: bar.Volume.Float()}
+	w.feed.mu.Lock()
+	symbol := w.feed.historyReq[id]
+	if symbol != "" {
+		w.feed.history[id] = upsertPoint(w.feed.history[id], point)
+	}
+	points := append([]Point(nil), w.feed.history[id]...)
+	w.feed.mu.Unlock()
+	w.publishHistory(symbol, points)
+}
+
+func (w *wrapper) publishHistory(symbol string, points []Point) {
+	if symbol == "" {
+		return
+	}
+	loc, err := time.LoadLocation(w.feed.cfg.App.Timezone)
+	if err == nil {
+		points = extendedSession(points, loc)
+	}
+	w.feed.hub.SetHistory(symbol, points)
+}
+
+func upsertPoint(points []Point, point Point) []Point {
+	for i := len(points) - 1; i >= 0; i-- {
+		if points[i].T == point.T {
+			points[i] = point
+			return points
+		}
+		if points[i].T < point.T {
+			points = append(points, Point{})
+			copy(points[i+2:], points[i+1:])
+			points[i+1] = point
+			return points
+		}
+	}
+	return append([]Point{point}, points...)
 }
 
 func extendedSession(points []Point, loc *time.Location) []Point {

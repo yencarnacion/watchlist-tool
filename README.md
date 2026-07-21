@@ -1,7 +1,7 @@
 # watchlist-tool
 
 A fast, dark-mode IBKR watchlist board for scalping. It displays live last price,
-percent change, cumulative day volume, and a compact day map; supports multiple
+percent change, cumulative volume since 04:00 ET, and a compact day map; supports multiple
 named watchlists, drag/drop and arrow reordering; and coordinates one-click ticker
 selection with `tape-reading-tool` and `polygon-charts`.
 

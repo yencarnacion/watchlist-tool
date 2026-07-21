@@ -45,3 +45,15 @@ func TestLiveHistoryCoalescesWithinMinute(t *testing.T) {
 		t.Fatalf("got latest minute price %.2f, want 11", got)
 	}
 }
+
+func TestUpsertPointReplacesLiveBarVolume(t *testing.T) {
+	points := []Point{{T: 1000, P: 10, V: 100}, {T: 2000, P: 11, V: 25}}
+	points = upsertPoint(points, Point{T: 2000, P: 12, V: 75})
+	if len(points) != 2 || points[1].P != 12 || points[1].V != 75 {
+		t.Fatalf("active bar was not replaced: %#v", points)
+	}
+	points = upsertPoint(points, Point{T: 1500, P: 10.5, V: 20})
+	if len(points) != 3 || points[1].T != 1500 {
+		t.Fatalf("new bar was not inserted in timestamp order: %#v", points)
+	}
+}
