@@ -15,22 +15,36 @@ import (
 	"watchlist-tool/internal/config"
 	"watchlist-tool/internal/market"
 	"watchlist-tool/internal/model"
+	"watchlist-tool/internal/tradingview"
 )
 
 //go:embed web/*
 var assets embed.FS
 
 type SymbolSetter interface{ SetSymbols([]string) }
+type tradingViewController interface {
+	Enabled() bool
+	Status(context.Context) tradingview.Status
+	SetSymbol(context.Context, string) error
+}
 type Server struct {
 	cfg    config.Config
 	store  *model.Store
 	hub    *market.Hub
 	feed   SymbolSetter
 	client *http.Client
+	tv     tradingViewController
 }
 
 func New(c config.Config, s *model.Store, h *market.Hub, f SymbolSetter) *Server {
-	return &Server{cfg: c, store: s, hub: h, feed: f, client: &http.Client{Timeout: 1200 * time.Millisecond}}
+	return &Server{
+		cfg:    c,
+		store:  s,
+		hub:    h,
+		feed:   f,
+		client: &http.Client{Timeout: 1200 * time.Millisecond},
+		tv:     tradingview.NewFromEnv(),
+	}
 }
 func (s *Server) Run(ctx context.Context) error {
 	mux := http.NewServeMux()
@@ -41,6 +55,7 @@ func (s *Server) Run(ctx context.Context) error {
 	mux.HandleFunc("/api/select", s.selectTicker)
 	mux.HandleFunc("/api/chart", s.chart)
 	mux.HandleFunc("/api/events", s.events)
+	s.registerTradingViewRoutes(mux)
 	sub, _ := fs.Sub(assets, "web")
 	mux.Handle("/", headers(http.FileServer(http.FS(sub))))
 	srv := &http.Server{Addr: s.cfg.App.Addr, Handler: mux, ReadHeaderTimeout: 4 * time.Second, IdleTimeout: 60 * time.Second}
@@ -65,7 +80,7 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q, st := s.hub.Snapshot()
-	write(w, 200, map[string]any{"layout": s.store.Get(), "quotes": q, "status": st, "config": map[string]any{"polygon_url": s.cfg.Integrations.PolygonURL, "timezone": s.cfg.App.Timezone}})
+	write(w, 200, map[string]any{"layout": s.store.Get(), "quotes": q, "status": st, "config": map[string]any{"polygon_url": s.cfg.Integrations.PolygonURL, "timezone": s.cfg.App.Timezone, "tradingview_enabled": s.tv != nil && s.tv.Enabled()}})
 }
 func (s *Server) tickers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -129,15 +144,7 @@ func (s *Server) selectTicker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	symbol := model.Symbol(in.Symbol)
-	body := strings.NewReader(`{"symbol":"` + symbol + `"}`)
-	req, _ := http.NewRequestWithContext(r.Context(), http.MethodPost, s.cfg.Integrations.TapeURL, body)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.client.Do(req)
-	tapeOK := err == nil && resp.StatusCode >= 200 && resp.StatusCode < 300
-	if resp != nil {
-		resp.Body.Close()
-	}
-	write(w, 200, map[string]any{"symbol": symbol, "tape_ok": tapeOK, "tape_error": errText(err)})
+	write(w, 200, s.selectIntegrations(r.Context(), symbol, loopbackRequest(r)))
 }
 func (s *Server) chart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

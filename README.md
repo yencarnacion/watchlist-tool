@@ -3,7 +3,7 @@
 A fast, dark-mode IBKR watchlist board for scalping. It displays live last price,
 percent change, cumulative volume since 04:00 ET, and a compact day map; supports multiple
 named watchlists, drag/drop and arrow reordering; and coordinates one-click ticker
-selection with `tape-reading-tool` and `polygon-charts`.
+selection with `tape-reading-tool`, TradingView Desktop, and `polygon-charts`.
 
 ## Run
 
@@ -22,6 +22,33 @@ so both can share TWS/Gateway. The app also uses its own web port (`8098`).
 
 Configuration lives in `config.yaml`. Saved lists live in
 `data/watchlists.json`. The file is replaced atomically after every change.
+
+## Optional TradingView Desktop integration
+
+A ticker-row click can also change the active chart in the locally running
+TradingView Desktop app. The integration is opt-in and uses a loopback-only
+Chrome DevTools Protocol endpoint; it does not require Node.js or a separately
+running MCP server.
+
+Enable it in `.env`:
+
+```dotenv
+WATCHLIST_TRADINGVIEW_ENABLED=true
+WATCHLIST_TRADINGVIEW_CDP_URL=http://127.0.0.1:9222
+WATCHLIST_TRADINGVIEW_TIMEOUT=3s
+```
+
+Launch TradingView with the included macOS helper before starting Watchlist Tool:
+
+```bash
+./scripts/launch-tradingview-debug-mac.sh
+```
+
+One debug-enabled TradingView instance can be shared with DaiDai and other local
+tools. The header shows `TV OFF`, `TV READY`, the most recently selected ticker,
+or `TV ERROR`. Full setup, verification, multi-app operation, security, and
+troubleshooting are documented in
+[`docs/TRADINGVIEW_DESKTOP_INTEGRATION.md`](docs/TRADINGVIEW_DESKTOP_INTEGRATION.md).
 
 ## Scanner / daidai API
 
@@ -50,9 +77,14 @@ immediately.
 - `POST /api/tickers` — add or promote a symbol
 - `DELETE /api/tickers/{id}` — remove a ticker
 - `PUT /api/layout` — persist list names and full ordering
-- `POST /api/select` — switch tape-reading-tool and return the chart deep link
+- `POST /api/select` — independently switch Tape Reading Tool and TradingView Desktop
+- `POST /api/chart` — return today's Polygon Charts deep link
+- `GET /api/integrations/tradingview/status` — report whether local TradingView CDP is ready
+- `POST /api/integrations/tradingview/ticker` — change the active TradingView chart directly
 - `GET /api/events` — live Server-Sent Events stream
 
-Clicking a ticker opens today's polygon-charts URL in a new tab and posts the
-same ticker to `http://127.0.0.1:8097/api/ticker`. Press `/` anywhere to focus the
-add box.
+Clicking the ticker portion of a row posts the same normalized ticker to
+`http://127.0.0.1:8097/api/ticker` and, when enabled, to the active TradingView
+Desktop chart. The two requests run independently, so either application can be
+offline without blocking the other. The chart-arrow button separately opens
+today's Polygon Charts URL. Press `/` anywhere to focus the add box.
