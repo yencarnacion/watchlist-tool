@@ -5,6 +5,7 @@
   if (!status) return;
   const label = status.querySelector('span');
   const nativeFetch = window.fetch.bind(window);
+  let lastSymbol = '';
 
   function showToast(message) {
     const toast = document.querySelector('#toast');
@@ -19,16 +20,19 @@
     status.className = 'status';
     status.style.marginLeft = '0';
     if (!payload || !payload.enabled) {
+      lastSymbol = '';
       label.textContent = 'TV OFF';
       status.title = 'TradingView Desktop integration is disabled';
       return;
     }
     if (payload.connected) {
+      if (payload.symbol) lastSymbol = String(payload.symbol).toUpperCase();
       status.classList.add('live');
-      label.textContent = payload.symbol ? `TV ${payload.symbol}` : 'TV READY';
+      label.textContent = lastSymbol ? `TV ${lastSymbol}` : 'TV READY';
       status.title = 'TradingView Desktop chart is connected';
       return;
     }
+    lastSymbol = '';
     status.classList.add('degraded');
     label.textContent = payload.error ? 'TV ERROR' : 'TV OFFLINE';
     status.title = payload.error || 'TradingView Desktop chart is unavailable';
