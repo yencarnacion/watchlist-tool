@@ -1,3 +1,4 @@
 .env
 /watchlist-tool
 data/*.json.tmp
+data/watchlists.json
