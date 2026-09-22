@@ -57,6 +57,7 @@ main{padding:12px;display:grid;gap:12px}
 .actions select{width:87px;height:34px;padding:0 5px;color:var(--muted);font-size:11px;font-weight:800}
 .actions button{width:33px;height:34px;padding:0;font-size:17px}
 .actions .chart{color:var(--cyan)}
+.actions .marketsurge{width:40px;color:var(--yellow);font-size:12px;letter-spacing:.02em}
 .remove-list:disabled{visibility:hidden}
 .delete{color:#ff7b88}
 .empty{height:70px;display:grid;place-items:center;color:#65707c;font-weight:750}
