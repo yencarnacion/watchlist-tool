@@ -151,9 +151,6 @@ func (s *Store) Delete(id string) error {
 }
 func validate(v *Layout) error {
 	seen := map[string]bool{}
-	if len(v.Lists) > 20 {
-		return errors.New("too many watchlists")
-	}
 	for i := range v.Lists {
 		v.Lists[i].Name = strings.TrimSpace(v.Lists[i].Name)
 		if v.Lists[i].ID == "" || v.Lists[i].Name == "" || seen[v.Lists[i].ID] {
