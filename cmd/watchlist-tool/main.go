@@ -38,14 +38,18 @@ func main() {
 	if *mode == "demo" {
 		feed = market.NewDemo(hub)
 	} else if *mode == "live" {
-		feed = market.NewIBKR(cfg, hub)
+		if cfg.Provider == "massive" {
+			feed = market.NewGateway(cfg, hub)
+		} else {
+			feed = market.NewIBKR(cfg, hub)
+		}
 	} else {
 		log.Fatalf("unknown mode %q", *mode)
 	}
 	srv := server.New(cfg, store, hub, feed)
 	srv.InitialSync()
 	go feed.Run(ctx)
-	log.Printf("watchlist-tool mode=%s listening=%s ibkr_client_id=%d", *mode, cfg.App.Addr, cfg.IBKR.ClientID)
+	log.Printf("watchlist-tool mode=%s provider=%s listening=%s", *mode, cfg.Provider, cfg.App.Addr)
 	if err = srv.Run(ctx); err != nil {
 		log.Fatal(err)
 	}

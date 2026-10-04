@@ -74,3 +74,5 @@ form{order:3;min-width:100%;max-width:none}
 .ticker{position:relative;padding-right:125px}
 .status{margin-left:0}
 }
+
+.ticker.stale .price { opacity: .65; text-decoration: underline dotted; }

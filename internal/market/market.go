@@ -21,6 +21,17 @@ type Point struct {
 	V float64 `json:"v,omitempty"`
 }
 type Quote struct {
+	Source         string `json:"source,omitempty"`
+	Feed           string `json:"feed,omitempty"`
+	Received       int64  `json:"received,omitempty"`
+	VolumeUpdated  int64  `json:"volume_updated,omitempty"`
+	BidAskUpdated  int64  `json:"bid_ask_updated,omitempty"`
+	Error          string `json:"error,omitempty"`
+	session        string
+	liveRevision   map[int64]int64
+	priceRevision  map[int64]int64
+	volumeRevision map[int64]int64
+
 	Symbol      string  `json:"symbol"`
 	CompanyName string  `json:"company_name,omitempty"`
 	Last        float64 `json:"last"`

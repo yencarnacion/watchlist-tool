@@ -44,20 +44,20 @@ Launch TradingView with the included macOS helper before starting Watchlist Tool
 ./scripts/launch-tradingview-debug-mac.sh
 ```
 
-One debug-enabled TradingView instance can be shared with DaiDai and other local
+One debug-enabled TradingView instance can be shared with another local scanner and other local
 tools. The header shows `TV OFF`, `TV READY`, the most recently selected ticker,
 or `TV ERROR`. Full setup, verification, multi-app operation, security, and
 troubleshooting are documented in
 [`docs/TRADINGVIEW_DESKTOP_INTEGRATION.md`](docs/TRADINGVIEW_DESKTOP_INTEGRATION.md).
 
-## Scanner / daidai API
+## Scanner / scanner API
 
 Add a ticker to the first list:
 
 ```bash
 curl -X POST http://localhost:8098/api/tickers \
   -H 'Content-Type: application/json' \
-  -d '{"symbol":"NVDA","note":"daidai momentum"}'
+  -d '{"symbol":"NVDA","note":"scanner momentum"}'
 ```
 
 Choose a list by its `ID` from `GET /api/state`:
@@ -88,3 +88,7 @@ Clicking the ticker portion of a row posts the same normalized ticker to
 Desktop chart. The two requests run independently, so either application can be
 offline without blocking the other. The chart-arrow button separately opens
 today's Polygon Charts URL. Press `/` anywhere to focus the add box.
+
+## Optional Massive market-data gateway
+
+IBKR remains the default. To select a Massive-compatible shared gateway, put `MARKET_DATA_PROVIDER=massive`, `MARKET_DATA_GATEWAY_URL` and the optional `MARKET_DATA_GATEWAY_TOKEN` in ignored `.env`. The URL points to your own adapter implementing the [gateway contract](docs/MARKET_DATA_GATEWAY.md). No private repository or provider API key is required in this client. Gateway errors stay visible; there is no automatic fallback to another provider.

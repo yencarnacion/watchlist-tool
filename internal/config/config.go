@@ -4,13 +4,23 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
+	"watchlist-tool/internal/marketgateway"
 
 	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
+	Provider string `yaml:"provider"`
+	Gateway  struct {
+		APIURL            string `yaml:"-" json:"-"`
+		Token             string `yaml:"-" json:"-"`
+		Channels          string `yaml:"-" json:"-"`
+		ReconnectInterval string `yaml:"-" json:"-"`
+		RefreshInterval   string `yaml:"-" json:"-"`
+	} `yaml:"-" json:"-"`
 	App struct {
 		Addr     string `yaml:"addr"`
 		Timezone string `yaml:"timezone"`
@@ -38,6 +48,10 @@ type Config struct {
 func Load(path string) (Config, error) {
 	_ = godotenv.Load()
 	var c Config
+	c.Provider = "ibkr"
+	c.Gateway.Channels = "A,AM,Q"
+	c.Gateway.ReconnectInterval = "2s"
+	c.Gateway.RefreshInterval = "60s"
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return c, err
@@ -61,6 +75,19 @@ func Load(path string) (Config, error) {
 		c.IBKR.ClientID, err = strconv.ParseInt(v, 10, 64)
 		if err != nil {
 			return c, fmt.Errorf("IBKR_CLIENT_ID: %w", err)
+		}
+	}
+	if v := strings.TrimSpace(os.Getenv("MARKET_DATA_PROVIDER")); v != "" {
+		c.Provider = strings.ToLower(v)
+	}
+	c.Gateway.APIURL = strings.TrimRight(os.Getenv("MARKET_DATA_GATEWAY_URL"), "/")
+	c.Gateway.Token = os.Getenv("MARKET_DATA_GATEWAY_TOKEN")
+	if c.Provider != "ibkr" && c.Provider != "massive" {
+		return c, fmt.Errorf("provider must be ibkr or massive")
+	}
+	if c.Provider == "massive" {
+		if e := marketgateway.Validate(c.Gateway.APIURL); e != nil {
+			return c, e
 		}
 	}
 	if c.IBKR.ClientID == 97 {

@@ -91,10 +91,10 @@ Update `.env` to match:
 WATCHLIST_TRADINGVIEW_CDP_URL=http://127.0.0.1:9333
 ```
 
-## Sharing TradingView with DaiDai and other local tools
+## Sharing TradingView with another local scanner and other local tools
 
 Only one debug-enabled TradingView Desktop instance is needed. Watchlist Tool
-and DaiDai can both connect to the same `127.0.0.1:9222` endpoint. Either
+and another local scanner can both connect to the same `127.0.0.1:9222` endpoint. Either
 repository's launcher may start it; the included launchers detect an already
 ready instance and exit without starting another one.
 
@@ -104,7 +104,7 @@ connection to TradingView on `9222`. It therefore does not conflict with:
 
 - Polygon Charts on `8081`
 - Tape Reading Tool on `8097`
-- DaiDai on its configured port
+- another local scanner on its configured port
 - Yamir Trading Tools on its configured ports
 - IB Gateway or TWS
 

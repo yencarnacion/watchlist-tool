@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Launch TradingView Desktop with a loopback-only Chrome DevTools Protocol port.
 # One debug-enabled TradingView instance can be shared by Watchlist Tool,
-# DaiDai, and other local applications.
+# other local applications.
 set -euo pipefail
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
