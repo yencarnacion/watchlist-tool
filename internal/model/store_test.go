@@ -1,6 +1,9 @@
 package model
 
-import "testing"
+import (
+	"strconv"
+	"testing"
+)
 
 func TestRepeatedScannerAlertPromotesWithoutDuplicate(t *testing.T) {
 	s, err := Open(t.TempDir() + "/watchlists.json")
@@ -54,5 +57,23 @@ func TestInvalidSymbolRejected(t *testing.T) {
 	s, _ := Open(t.TempDir() + "/watchlists.json")
 	if _, err := s.Add("bad symbol", "focus", ""); err == nil {
 		t.Fatal("expected invalid symbol error")
+	}
+}
+
+func TestReplaceAllowsMoreThanTwentyWatchlists(t *testing.T) {
+	s, err := Open(t.TempDir() + "/watchlists.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout := Layout{Lists: []List{{ID: "api", Name: "API", Color: "#9bdb4d"}}}
+	for i := 0; i < 24; i++ {
+		n := strconv.Itoa(i)
+		layout.Lists = append(layout.Lists, List{ID: "list-" + n, Name: "LIST " + n})
+	}
+	if err = s.Replace(layout); err != nil {
+		t.Fatalf("Replace with 25 watchlists: %v", err)
+	}
+	if got := len(s.Get().Lists); got != 25 {
+		t.Fatalf("watchlist count = %d, want 25", got)
 	}
 }
