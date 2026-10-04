@@ -76,3 +76,23 @@ form{order:3;min-width:100%;max-width:none}
 }
 
 .ticker.stale .price { opacity: .65; text-decoration: underline dotted; }
+
+/* This form works in native web views without browser prompt dialogs. */
+.new-list-form[hidden]{display:none}
+.new-list-form{margin:12px;width:calc(100% - 24px);min-width:0;max-width:none;height:auto;flex:none;align-items:center;flex-wrap:wrap;padding:12px;background:var(--panel2);border:1px solid var(--cyan);border-radius:7px;gap:8px}
+.new-list-form label{font-size:12px;font-weight:850;color:var(--muted)}
+.new-list-form input{min-width:120px;height:40px;flex:1 1 180px}
+.new-list-form button{min-height:40px}
+.new-list-form .secondary{background:#141a21;border-color:#303945;color:var(--text)}
+.new-list-form button:disabled{cursor:wait;opacity:.6}
+#newListError{flex-basis:100%;color:#ff9ca6;font-size:14px}
+#newListError:empty{display:none}
+#newList{white-space:nowrap;flex-shrink:0}
+
+/* Long group names and feed messages must not push + LIST off a laptop screen. */
+#addForm{min-width:0}
+#symbolInput{min-width:80px}
+#listSelect{width:clamp(90px,14vw,180px);min-width:80px}
+body>header>.status{min-width:0;max-width:220px}
+body>header>.status i{flex-shrink:0}
+body>header>.status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

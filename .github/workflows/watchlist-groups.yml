@@ -1,0 +1,14 @@
+name: Watchlist group form
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --input-type=module --check < internal/server/web/app.js
+      - run: node --test scripts/watchlist-group-form.test.mjs
