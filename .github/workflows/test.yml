@@ -1,0 +1,29 @@
+name: Watchlist verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: watchlist-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Race tests, vet and browser script syntax
+        run: |
+          go test -race -timeout 2m ./...
+          go vet ./...
+          node --input-type=module --check < internal/server/web/app.js
+      - name: Build app for Linux, Apple Silicon and Windows
+        run: |
+          go build -o "$RUNNER_TEMP/watchlist-tool" ./cmd/watchlist-tool
+          GOOS=darwin GOARCH=arm64 go build -o "$RUNNER_TEMP/watchlist-tool-mac" ./cmd/watchlist-tool
+          GOOS=windows GOARCH=amd64 go build -o "$RUNNER_TEMP/watchlist-tool.exe" ./cmd/watchlist-tool
