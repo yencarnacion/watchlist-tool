@@ -130,11 +130,6 @@ func ensureAPI(v *Layout) {
 	if v.Lists[api].Color == "" {
 		v.Lists[api].Color = "#9bdb4d"
 	}
-	if api > 0 {
-		list := v.Lists[api]
-		v.Lists = append(v.Lists[:api], v.Lists[api+1:]...)
-		v.Lists = append([]List{list}, v.Lists...)
-	}
 }
 func (s *Store) Delete(id string) error {
 	s.mu.Lock()

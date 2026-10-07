@@ -52,7 +52,7 @@ troubleshooting are documented in
 
 ## Scanner / scanner API
 
-Add a ticker to the first list:
+Add a ticker to the permanent API list:
 
 ```bash
 curl -X POST http://localhost:8098/api/tickers \
@@ -92,3 +92,12 @@ today's Polygon Charts URL. Press `/` anywhere to focus the add box.
 ## Optional Massive market-data gateway
 
 IBKR remains the default. To select a Massive-compatible shared gateway, put `MARKET_DATA_PROVIDER=massive`, `MARKET_DATA_GATEWAY_URL` and the optional `MARKET_DATA_GATEWAY_TOKEN` in ignored `.env`. The URL points to your own adapter implementing the [gateway contract](docs/MARKET_DATA_GATEWAY.md). No private repository or provider API key is required in this client. Gateway errors stay visible; there is no automatic fallback to another provider.
+
+
+## List controls
+
+Each list header has **A–Z** to save ascending ticker order, and **↑ / ↓** to
+move the whole list. The API list remains permanent and can be reordered too;
+default additions still target its ID wherever it sits. Row arrows and drag/drop
+continue to change ticker order separately. The **MS** row button opens that
+symbol in MarketSurge in a new tab.

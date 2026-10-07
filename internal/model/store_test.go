@@ -77,3 +77,30 @@ func TestReplaceAllowsMoreThanTwentyWatchlists(t *testing.T) {
 		t.Fatalf("watchlist count = %d, want 25", got)
 	}
 }
+
+func TestListOrderIncludingAPIPersistsAfterReload(t *testing.T) {
+	path := t.TempDir() + "/watchlists.json"
+	store, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout := store.Get()
+	layout.Lists[0], layout.Lists[2] = layout.Lists[2], layout.Lists[0]
+	if err = store.Replace(layout); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := reloaded.Get()
+	if got.Lists[0].ID != "watch" || got.Lists[2].ID != "api" {
+		t.Fatalf("order not preserved: %+v", got.Lists)
+	}
+	if _, err = reloaded.Add("NVDA", "", "default API target"); err != nil {
+		t.Fatal(err)
+	}
+	if got = reloaded.Get(); len(got.Lists[2].Items) != 1 || got.Lists[2].Items[0].Symbol != "NVDA" {
+		t.Fatalf("API target did not follow reordered list: %+v", got)
+	}
+}

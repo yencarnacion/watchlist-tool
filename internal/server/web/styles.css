@@ -96,3 +96,12 @@ form{order:3;min-width:100%;max-width:none}
 body>header>.status{min-width:0;max-width:220px}
 body>header>.status i{flex-shrink:0}
 body>header>.status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Board order and ticker order are separate, explicit controls. */
+.list-head{height:auto;min-height:45px;flex-wrap:wrap;padding:7px 10px}
+.list-name{flex:1;min-width:100px;max-width:340px}
+.list-controls{display:flex;gap:5px;margin-left:auto}
+.list-controls button{min-width:34px;min-height:32px;padding:3px 8px}
+.list-controls button:disabled{opacity:.35;cursor:default}
+.remove-list{margin-left:0}
+.actions{flex-wrap:wrap}
